@@ -11,11 +11,10 @@ import Events from "@/Timeline/Events/Events.vue";
 import { useGestures } from "@/Timeline/composables/useGestures";
 import { useHoveringMarker } from "@/Timeline/composables/useHoveringMarker";
 import { DateTime } from "luxon";
-import { useResizeObserver } from "@vueuse/core";
+import { useDebounceFn, useResizeObserver } from "@vueuse/core";
 import { toDateRange, type DateRange } from "@markwhen/parser";
 import { dateMidpoint, diffScale } from "./utilities/dateTimeUtilities";
-// import { useEventFinder } from "@/Views/ViewOrchestrator/useEventFinder";
-import { eventValue, isEventNode } from "@markwhen/parser";
+import { isEvent } from "@markwhen/parser";
 import DebugView from "./DebugView.vue";
 import { ranges } from "@/utilities/ranges";
 import { useNodePosition } from "./Events/composables/useNodePosition";
@@ -26,9 +25,6 @@ import Settings from "./Settings/Settings.vue";
 import ReferenceDateVue from "./Events/ReferenceDate.vue";
 import NowLine from "./Events/NowLine.vue";
 import { useDoubleTap } from "./composables/useDoubleTap";
-
-// 添加版本号常量
-const VERSION = "1.0.4"; // 每次发布时更新此版本号
 
 const timelineStore = useTimelineStore();
 const markwhenStore = useMarkwhenStore();
@@ -46,8 +42,8 @@ markwhenStore.onJumpToPath = (path) => {
     return;
   }
 
-  const range = isEventNode(node)
-    ? eventValue(node).dateRangeIso
+  const range = isEvent(node)
+    ? node.dateRangeIso
     : ranges(node, recurrenceLimit);
 
   if (!range) {
@@ -139,13 +135,22 @@ watch(
   }
 );
 
-useResizeObserver(timelineElement, (entries) => {
-  timelineStore.referenceDate = timelineStore.dateFromClientLeft(
-    entries[0].target.clientLeft + entries[0].target.clientWidth / 2
-  );
-  timelineElement.value!.scrollLeft = timelineElement.value!.clientWidth * 2;
-  nextTick(setViewportDateInterval);
-});
+useResizeObserver(
+  timelineElement,
+  useDebounceFn(
+    (entries) => {
+      const middle =
+        (entries[0].target.clientLeft || 0) +
+        (entries[0].target.clientWidth / 2 || 0);
+      timelineStore.referenceDate = timelineStore.dateFromClientLeft(middle);
+      timelineElement.value!.scrollLeft =
+        timelineElement.value!.clientWidth * 2;
+      nextTick(setViewportDateInterval);
+    },
+    250,
+    {}
+  )
+);
 
 const setViewportDateInterval = () => timelineStore.setViewport(getViewport());
 
@@ -222,14 +227,13 @@ onActivated(() => {
 const setInitialScrollAndScale = () =>
   scrollToDateRangeImmediate(timelineStore.pageRange);
 
+const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent);
 onMounted(() => {
-  // 输出版本号到控制台
-  console.log(`Markwhen Timeline Version: ${VERSION}`);
-
   // scrollToNow();
   timelineStore.setViewportGetter(getViewport);
   const te = timelineElement.value!;
   te.scrollLeft = te.clientWidth * 2;
+  // if (!isIOS()) {
   scroll = () => {
     const scrollLeft = te.scrollLeft;
     const amount = {
@@ -245,6 +249,8 @@ onMounted(() => {
     setViewportDateInterval();
     trigger();
   };
+  // } else {
+  // }
 });
 
 const svgParams = ref();
@@ -296,7 +302,7 @@ const pointerdown = useDoubleTap(setViewportDateInterval);
   >
     <div
       id="timeline"
-      class="relative overflow-auto w-full dark:text-white text-gray-900 bg-white dark:bg-slate-800"
+      class="relative overflow-auto w-full dark:text-white text-gray-900 bg-white dark:bg-zinc-800 noScrollBar"
       ref="timelineElement"
       @scroll="scroll"
       @gestureChange="scroll"
@@ -306,7 +312,6 @@ const pointerdown = useDoubleTap(setViewportDateInterval);
       <now-line />
       <ReferenceDateVue v-if="false"></ReferenceDateVue>
       <Events />
-      <!-- <TimeMarkersFront /> -->
       <Settings></Settings>
       <!-- <DebugView v-if="true" /> -->
       <div ref="svgHolder" style="width: 0; height: 0">

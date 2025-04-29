@@ -13,13 +13,14 @@ import {
   timeMarkerWeightMinimum,
   useTimelineStore,
 } from "../timelineStore";
-import { isEventNode } from "@markwhen/parser";
+import { EventGroup, isEvent, iter, Event } from "@markwhen/parser";
 import { toDateRange } from "@markwhen/parser";
 import { useEventColor } from "../Events/composables/useEventColor";
 import { equivalentPaths } from "../paths";
-import { useNodeStore, walk } from "../useNodeStore";
+import { useNodeStore } from "../useNodeStore";
 import { DateTime } from "luxon";
 import { granularities } from "../utilities/DateTimeDisplay";
+import type { Sourced } from "@/Markwhen/useLpc";
 
 const markersStore = useMarkersStore();
 const timelineStore = useTimelineStore();
@@ -42,8 +43,8 @@ const backgroundColor = computed(() => (tm: TimeMarker) => {
       weekday.weekday === 7
     ) {
       return dark.value
-        ? `rgba(10, 10, 10, ${a})`
-        : `rgba(170, 170, 170, ${a})`;
+        ? `rgba(113, 113, 122, ${a})`
+        : `rgba(161, 161, 170, ${a})`;
     }
   }
   return "unset";
@@ -63,7 +64,7 @@ const alpha = computed(
 
 const borderColor = computed(() => (tm: TimeMarker) => {
   const a = hovering.value(tm) ? 1 : (alpha.value(tm) - 0.3) * 2;
-  return dark.value ? `rgba(71, 85, 105, ${a})` : `rgba(200, 200, 200, ${a})`;
+  return dark.value ? `rgba(82, 82, 91, ${a})` : `rgba(200, 200, 200, ${a})`;
 });
 
 const eras = computed(() => {
@@ -71,24 +72,21 @@ const eras = computed(() => {
   if (!timelineStore.transformedEvents) {
     return [];
   }
-  walk(timelineStore.transformedEvents, [], (node, path) => {
+  for (const { eventy, path } of iter(timelineStore.transformedEvents)) {
     if (
-      isEventNode(node) &&
+      isEvent(eventy) &&
       ["era", "milestone"].some((t) =>
-        node.value.eventDescription.tags.map((t) => t.toLowerCase()).includes(t)
+        eventy.tags.map((t) => t.toLowerCase()).includes(t)
       )
     ) {
-      const { fromDateTime, toDateTime } = toDateRange(node.value.dateRangeIso);
-      const color = useEventColor(node).color.value;
+      const { fromDateTime, toDateTime } = toDateRange(eventy.dateRangeIso);
+      const color = useEventColor(eventy as Sourced<Event>).color.value;
       const isHovering = equivalentPaths(
         timelineStore.hoveringEventPaths,
         path
       );
       const styleObj = {
-        left:
-          timelineStore.distanceFromViewportLeftDate(fromDateTime) +
-          timelineStore.leftInsetWidth -
-          viewportLeftMarginPixels,
+        left: timelineStore.distanceFromBaselineLeftmostDate(fromDateTime),
         width: Math.max(
           2,
           timelineStore.distanceBetweenDates(fromDateTime, toDateTime)
@@ -100,7 +98,7 @@ const eras = computed(() => {
       }
       erasAndMilestoneEvents.push(styleObj);
     }
-  });
+  }
   return erasAndMilestoneEvents;
 });
 const scaleForThisDate = computed(
@@ -143,7 +141,7 @@ const hoveringText = computed(() => (timeMarker: TimeMarker) => {
 
 <template>
   <div
-    class="fixed top-0 left-0 right-0 h-6 bg-white/95 dark:bg-slate-800/95 z-30 border-b dark:border-slate-700"
+    class="fixed top-0 left-0 right-0 h-6 bg-white/95 dark:bg-zinc-800/95 z-30 border-b dark:border-zinc-700"
   ></div>
   <div
     v-for="timeMarker in markersStore.markers"
@@ -165,9 +163,9 @@ const hoveringText = computed(() => (timeMarker: TimeMarker) => {
     <div
       class="sticky top-0 -m-px"
       :class="{
-        'font-bold z-50 dark:border-slate-400 border-slate-500':
+        'font-bold z-50 dark:border-zinc-400 border-zinc-500':
           isHovering(timeMarker),
-        'z-40 dark:border-slate-600': !isHovering(timeMarker),
+        'z-40 dark:border-zinc-600': !isHovering(timeMarker),
       }"
     >
       <h6
@@ -180,7 +178,7 @@ const hoveringText = computed(() => (timeMarker: TimeMarker) => {
       </h6>
       <div v-if="currentDateResolution <= 6" class="flex flex-row">
         <h6
-          class="whitespace-nowrap text-xs font-bold dark:bg-slate-800 bg-white border-l p-1 dark:border-slate-400 border-slate-500"
+          class="whitespace-nowrap text-xs font-bold dark:bg-zinc-800 bg-white border-l p-1 dark:border-zinc-400 border-zinc-500"
           v-if="isHovering(timeMarker)"
         >
           {{ hoveringText(timeMarker) }}
@@ -199,7 +197,8 @@ const hoveringText = computed(() => (timeMarker: TimeMarker) => {
     "
     :style="{
       left: `${era.left}px`,
-      width: `${era.width}px`,
+      width: `max(${era.width}px, 10px)`,
+      height: `max(${nodeStore.viewHeight}, 100%)`,
       backgroundColor: era.backgroundColor,
       borderColor: era.borderColor,
     }"

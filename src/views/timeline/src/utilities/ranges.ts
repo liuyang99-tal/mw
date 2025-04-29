@@ -1,11 +1,7 @@
-import type {
-  SomeNode,
-  GroupRange,
-  NodeArray,
-} from "@markwhen/parser";
-import { Event, toDateRange, type DateRange } from "@markwhen/parser";
+import type { Eventy, GroupRange } from "@markwhen/parser";
+import { Event, isEvent, toDateRange, type DateRange } from "@markwhen/parser";
 import { expand } from "@markwhen/parser";
-import LRUCache from "lru-cache";
+import { LRUCache } from "lru-cache";
 
 const cache = new LRUCache<string, DateRange>({ max: 1000 });
 const cacheAndReturn = (cacheKey: string, dateRange: DateRange) => {
@@ -39,21 +35,24 @@ export type RecurrenceRangeOptions = {
   recurrenceLimit: number;
 };
 
-export const ranges = (root: SomeNode, recurrenceLimit: number): GroupRange => {
-  if (!root || !root.value) {
+export const ranges = (
+  root: Eventy,
+  recurrenceLimit: number
+): GroupRange | undefined => {
+  if (!root) {
     return undefined;
   }
 
-  if (!Array.isArray(root.value)) {
-    const eRange = eventRange(root.value, recurrenceLimit);
+  if (isEvent(root)) {
+    const eRange = eventRange(root, recurrenceLimit);
     return {
       ...eRange,
       maxFrom: eRange.fromDateTime,
     };
   }
 
-  const childRanges = (root.value as NodeArray).reduce((prev, curr) => {
-    const currRange: GroupRange = ranges(curr, recurrenceLimit);
+  const childRanges = root.children.reduce((prev, curr) => {
+    const currRange: GroupRange | undefined = ranges(curr, recurrenceLimit);
     if (!prev) {
       return currRange;
     }
@@ -78,7 +77,7 @@ export const ranges = (root: SomeNode, recurrenceLimit: number): GroupRange => {
       maxFrom,
     };
     return range;
-  }, undefined as GroupRange);
+  }, undefined as GroupRange | undefined);
 
   return childRanges;
 };

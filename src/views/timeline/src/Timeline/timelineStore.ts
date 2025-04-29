@@ -1,22 +1,21 @@
 import { defineStore } from "pinia";
-import { DateTime, Interval } from "luxon";
-import {
-  diffScale,
-  floorDateTime,
-  scales,
-  viewportLeftMarginPixels,
-} from "@/Timeline/utilities/dateTimeUtilities";
-import { ref, computed, watchEffect, watch } from "vue";
+import { DateTime, type DurationUnit } from "luxon";
+import { diffScale, scales } from "@/Timeline/utilities/dateTimeUtilities";
+import { ref, computed, watch } from "vue";
 import type { EventPath } from "@/Timeline/paths";
 import { ranges } from "@/utilities/ranges";
-import {
-  initialPageSettings,
-  calculateBaselineLeftmostDate,
-  scaleToGetDistance,
-} from "./initialPageSettings";
+import { initialPageSettings } from "./initialPageSettings";
 import { useMarkwhenStore } from "@/Markwhen/markwhenStore";
-import type { Node, NodeArray } from "@markwhen/parser";
+import {
+  isEvent,
+  iter,
+  RECURRENCE_AMOUNT_REGEX,
+  toDateRange,
+} from "@markwhen/parser";
 import type { DateRange } from "@markwhen/parser";
+import { lsRef } from "./utilities/localStorageRef";
+import type { Sourced } from "@/Markwhen/useLpc";
+import type { EventGroup } from "@markwhen/parser";
 
 export const recurrenceLimit = 100;
 
@@ -69,19 +68,36 @@ export const MAX_SCALE = 30000000;
 export const useTimelineStore = defineStore("timeline", () => {
   const markwhenStore = useMarkwhenStore();
   const markwhenState = computed(() => markwhenStore.markwhen!);
-  const dateTimeDisplay = ref<"original" | "off">(
-    (typeof localStorage !== "undefined" &&
-      (localStorage.getItem("dateTimeDisplay") as "original" | "off")) ||
-      "original"
+  const dateTimeDisplay = lsRef<"original" | "off">(
+    "dateTimeDisplay2",
+    "original"
   );
-  const progressDisplay = ref<"on" | "off">(
-    (typeof localStorage !== "undefined" &&
-      (localStorage.getItem("progressDisplay") as "on" | "off")) ||
-      "on"
-  );
+  const progressDisplay = lsRef<"on" | "off">("progressDisplay2", "on");
 
-  const pageTimeline = computed(() => markwhenState.value.parsed[0]);
-  const pageTimelineMetadata = computed(() => pageTimeline.value.metadata);
+  const pageTimeline = computed(() => markwhenState.value.parsed);
+  const pageTimelineMetadata = computed(() => {
+    const now = DateTime.now();
+    if (!pageTimeline.value.events.children.length) {
+      return {
+        earliestTime: now.minus({ years: 2 }),
+        latestTime: now.plus({ years: 2 }),
+      };
+    }
+    let latestTime = DateTime.now().minus({ years: 10 });
+    let earliestTime = DateTime.now().plus({ years: 10 });
+    for (const { eventy } of iter(pageTimeline.value.events)) {
+      if (isEvent(eventy)) {
+        const dr = toDateRange(eventy.dateRangeIso);
+        if (+dr.fromDateTime < +earliestTime) {
+          earliestTime = dr.fromDateTime;
+        }
+        if (+dr.toDateTime > +latestTime) {
+          latestTime = dr.toDateTime;
+        }
+      }
+    }
+    return { earliestTime, latestTime };
+  });
   const tags = computed(() =>
     Object.keys(pageTimeline.value.header)
       .filter((entry) => entry.startsWith(")"))
@@ -93,7 +109,7 @@ export const useTimelineStore = defineStore("timeline", () => {
         {} as { [key: string]: any }
       )
   );
-  const transformedEvents = computed<Node<NodeArray>>(
+  const transformedEvents = computed<Sourced<EventGroup>>(
     () => markwhenState.value.transformed!
   );
   const darkMode = computed(() => !!markwhenStore.app?.isDark);
@@ -119,7 +135,7 @@ export const useTimelineStore = defineStore("timeline", () => {
   const pageSettings = ref(
     (() => {
       const viewport = viewportGetter.value?.();
-      return initialPageSettings(markwhenState.value?.parsed[0], viewport);
+      return initialPageSettings(markwhenState.value?.parsed, viewport);
     })()
   );
   const startedWidthChange = ref(false);
@@ -127,39 +143,14 @@ export const useTimelineStore = defineStore("timeline", () => {
   const goToNowSemaphore = ref(0);
   const scrollToPath = ref<EventPath>();
   const shouldZoomWhenScrolling = ref<boolean>(true);
-  const mode = ref<TimelineMode>(
-    (typeof localStorage !== "undefined" &&
-      (localStorage.getItem("preferredMode") as TimelineMode)) ||
-      "timeline"
-  );
+  const mode = lsRef<TimelineMode>("preferredMode2", "timeline");
   const ganttSidebarWidth = ref(200);
   const ganttSidebarTempWidth = ref(0);
   const autoCenterSemaphore = ref(0);
-  const miniMapShowing = ref(false);
-
-  watch(mode, (m) => {
-    if (typeof localStorage !== "undefined") {
-      localStorage.setItem("preferredMode", m);
-    }
-  });
-
-  watch(dateTimeDisplay, (dtd) => {
-    if (typeof localStorage !== "undefined") {
-      localStorage.setItem("dateTimeDisplay", dtd);
-    }
-  });
-
-  watch(progressDisplay, (pd) => {
-    if (typeof localStorage !== "undefined") {
-      localStorage.setItem("progressDisplay", pd);
-    }
-  });
 
   const autoCenter = () => {
     autoCenterSemaphore.value++;
   };
-
-  const toggleMiniMap = () => (miniMapShowing.value = !miniMapShowing.value);
 
   const leftInsetWidth = computed(() =>
     mode.value === "gantt"
@@ -176,14 +167,7 @@ export const useTimelineStore = defineStore("timeline", () => {
     ganttSidebarWidth.value = width;
   };
 
-  const pageScale = computed(() => pageSettings.value.scale);
-
-  const earliest = computed(() => pageRange.value.fromDateTime);
-
-  const maxDurationDays = computed(
-    () => pageTimelineMetadata.value.maxDurationDays
-  );
-
+  const pageScale = computed(() => pageSettings.value.scale || 1);
   const hoveringDate = ref(DateTime.now());
 
   const referenceDate = ref(DateTime.now());
@@ -271,11 +255,56 @@ export const useTimelineStore = defineStore("timeline", () => {
     24;
 
   const dateFromClientLeft = computed(() => (offset: number) => {
-    const d = baselineLeftmostDate.value.plus({
-      [diffScale]:
-        ((offset + pageSettings.value.viewport.left) / pageScale.value) * 24,
-    });
-    return d;
+    try {
+      const d = baselineLeftmostDate.value.plus({
+        [diffScale]:
+          ((offset + pageSettings.value.viewport.left) / pageScale.value) * 24,
+      });
+      return d;
+    } catch {
+      return DateTime.now();
+    }
+  });
+
+  const userRanges = computed(() => {
+    const ranges = markwhenStore.markwhen?.parsed.header.ranges;
+    const parsedRanges: (DateRange & { title: string })[] = [];
+    if (ranges && Array.isArray(ranges)) {
+      const now = DateTime.now();
+      for (let i = 0; i < ranges.length; i++) {
+        let r = ranges[i];
+        let regex = new RegExp(`^${RECURRENCE_AMOUNT_REGEX.source}$`);
+        const match = regex.exec(r);
+        if (match) {
+          const amount = parseInt(match[1]);
+          if (isNaN(amount)) {
+            continue;
+          }
+          const unit: DurationUnit = !!match[3]
+            ? "milliseconds"
+            : !!match[4]
+            ? "seconds"
+            : !!match[5]
+            ? "minutes"
+            : !!match[6]
+            ? "hours"
+            : !!match[8]
+            ? "days"
+            : !!match[9]
+            ? "weeks"
+            : match[10]
+            ? "months"
+            : "years";
+          const duration = { [unit]: amount / 2 };
+          parsedRanges.push({
+            title: r,
+            fromDateTime: now.minus(duration),
+            toDateTime: now.plus(duration),
+          });
+        }
+      }
+    }
+    return parsedRanges;
   });
 
   const setViewport = (viewport: Viewport) => {
@@ -365,7 +394,6 @@ export const useTimelineStore = defineStore("timeline", () => {
     ganttSidebarWidth,
     ganttSidebarTempWidth,
     autoCenterSemaphore,
-    miniMapShowing,
     dateTimeDisplay,
     progressDisplay,
     colors: computed(() => markwhenStore.app?.colorMap),
@@ -374,6 +402,7 @@ export const useTimelineStore = defineStore("timeline", () => {
     baselineLeftmostDate,
     baselineRightmostDate,
     diffAmount,
+    userRanges,
     // editable,
 
     // getters
@@ -420,7 +449,6 @@ export const useTimelineStore = defineStore("timeline", () => {
     setGanttSidebarWidth,
     setGanttSidebarTempWidth,
     autoCenter,
-    toggleMiniMap,
     goToNow,
     goToNowSemaphore,
     setRange,

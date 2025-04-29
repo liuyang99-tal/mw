@@ -10,7 +10,7 @@ const now = ref(DateTime.now());
 
 const setNow = () => {
   now.value = DateTime.now();
-  setTimeout(() => setNow(), 1000 * 60);
+  setTimeout(() => setNow(), 1000 * 6);
 };
 
 onMounted(() => {
@@ -28,7 +28,7 @@ const left = computed(() => {
 <template>
   <div
     v-if="!timelineStore.hideNowLine"
-    class="absolute dark:bg-slate-400 bg-blue-300 top-0 bottom-0"
+    class="absolute dark:bg-zinc-400 bg-blue-300 top-0 bottom-0"
     :style="`width: 1px; left: ${left}px; height: max(${nodeStore.viewHeight}, 100%);`"
   ></div>
 </template>

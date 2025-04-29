@@ -1,20 +1,29 @@
 <script setup lang="ts">
-defineProps<{
+import { useTimelineStore } from "@/Timeline/timelineStore";
+import { computed, mergeProps } from "vue";
+
+const props = defineProps<{
   move: (e: MouseEvent | TouchEvent) => void;
   left: number;
 }>();
 const emit = defineEmits<{ (event: "edit"): void }>();
+
+const timelineStore = useTimelineStore();
+
+const adjustedLeft = computed(() => {
+  return timelineStore.mode === "gantt" ? props.left : 0;
+});
 </script>
 
 <template>
   <div
     class="flex flex-row text-gray-500 dark:text-gray-400 absolute mr-8 moveWidgets top-0 bottom-0 items-center justify-center p-2"
-    style="left: -3.6rem"
+    :style="{ left: `calc(${adjustedLeft}px - 3.6rem)` }"
   >
     <div class="flex flex-row items-center justify-center">
       <button
         title="Edit event"
-        class="mr-1 transition dark:hover:text-slate-100 hover:text-black rounded-sm p-px disabled:text-gray-300 disabled:dark:text-gray-600"
+        class="mr-1 transition dark:hover:text-zinc-100 hover:text-black rounded-sm p-px disabled:text-gray-300 disabled:dark:text-gray-600"
         @click="emit('edit')"
       >
         <svg
@@ -31,7 +40,7 @@ const emit = defineEmits<{ (event: "edit"): void }>();
     </div>
     <div
       title="Drag to move"
-      class="handle flex items-center justify-center cursor-crosshair touch-none hover:text-black dark:hover:text-slate-100 transition"
+      class="handle flex items-center justify-center cursor-crosshair touch-none hover:text-black dark:hover:text-zinc-100 transition"
       @touchstart="move"
       @mousedown.prevent.stop="move"
     >

@@ -18,7 +18,7 @@ export const useDoubleTap = (setViewport: () => void) => {
     x: 0,
     y: 0,
   };
-  let timeout: ReturnType<typeof setTimeout>;
+  let timeout: number;
 
   const timelineStore = useTimelineStore();
   let initialScale = 0;
@@ -26,7 +26,7 @@ export const useDoubleTap = (setViewport: () => void) => {
   let initialY = 0;
 
   const addMoveListeners = (element: HTMLDivElement) => {
-    const pointerMove = useDebounceFn((moveEvent: PointerEvent) => {
+    const pointerMove = (moveEvent: PointerEvent) => {
       const yDiff = initialY - moveEvent.clientY;
       const newScale = yDiff < 0 ? (yDiff - 10) / -10 : 10 / (yDiff + 10);
       timelineStore.setPageScale(Math.max(initialScale * newScale, 0.01));
@@ -34,7 +34,7 @@ export const useDoubleTap = (setViewport: () => void) => {
       moveEvent.stopPropagation();
       moveEvent.stopImmediatePropagation();
       moveEvent.preventDefault();
-    }, 20);
+    }
 
     function pointerUp() {
       console.log("pointer up");
@@ -44,15 +44,6 @@ export const useDoubleTap = (setViewport: () => void) => {
 
     element.addEventListener("pointermove", pointerMove);
     element.addEventListener("pointerup", pointerUp);
-    element.addEventListener("pointercancel", () => {
-      console.log("canceled");
-    });
-    element.addEventListener("pointerout", () => {
-      console.log("out");
-    });
-    element.addEventListener("pointerleave", () => {
-      console.log("leave");
-    });
   };
 
   const pointerListener = (e: PointerEvent) => {

@@ -17,10 +17,7 @@ export interface Settings {
 export const scaleToGetDistance = (distance: number, range: DateRange) =>
   (distance * 24) / range.toDateTime.diff(range.fromDateTime).as(diffScale);
 
-export const calculateBaselineLeftmostDate = (
-  earliestDateTime: DateTime,
-  maxDurationDays: number
-) => {
+export const calculateBaselineLeftmostDate = (earliestDateTime: DateTime) => {
   return floorDateTime(earliestDateTime.minus({ years: 3 }), "year");
 };
 
@@ -29,16 +26,15 @@ export function initialPageSettings(
   viewport?: Viewport
 ): Settings {
   if (viewport && timeline) {
+    let earliestTime = DateTime.now().plus({ years: 1 }).toISO();
+    let latestTime = DateTime.now().minus({ years: 1 }).toISO();
     const range = {
-      fromDateTime: DateTime.fromISO(timeline.metadata.earliestTime),
-      toDateTime: DateTime.fromISO(timeline.metadata.latestTime),
+      fromDateTime: DateTime.fromISO(earliestTime),
+      toDateTime: DateTime.fromISO(latestTime),
     };
     const scale = scaleToGetDistance(viewport.width, range) / 3;
     const midpoint = dateMidpoint(range);
-    const bslmd = calculateBaselineLeftmostDate(
-      DateTime.fromISO(timeline.metadata.earliestTime),
-      timeline.metadata.maxDurationDays
-    );
+    const bslmd = calculateBaselineLeftmostDate(DateTime.fromISO(earliestTime));
     const fromLeft = (midpoint.diff(bslmd).as(diffScale) * scale) / 24;
     return {
       scale,

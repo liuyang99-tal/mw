@@ -1,7 +1,12 @@
 import { equivalentPaths, type EventPath } from "@/Timeline/paths";
 import { defineStore } from "pinia";
 import { computed, ref, watchEffect } from "vue";
-import { useLpc, type AppState, type MarkwhenState } from "./useLpc";
+import {
+  useLpc,
+  type AppState,
+  type MarkwhenState,
+  type Sourced,
+} from "./useLpc";
 import type {
   DateFormat,
   DateRangeIso,
@@ -11,6 +16,7 @@ import type { DisplayScale } from "@/Timeline/utilities/dateTimeUtilities";
 import { useRoute } from "vue-router";
 import { parse } from "@markwhen/parser";
 import { useColors } from "./useColors";
+import type { EventGroup } from "@markwhen/parser";
 
 export const useMarkwhenStore = defineStore("markwhen", () => {
   const route = useRoute();
@@ -18,42 +24,14 @@ export const useMarkwhenStore = defineStore("markwhen", () => {
   const markwhen = ref<MarkwhenState>();
   const showEditButton = ref(false);
   const showCopyLinkButton = ref(true);
-
   const onJumpToPath = ref((path: EventPath) => {});
   const onJumpToRange = ref((range: DateRangeIso) => {});
   const onGetSvg = ref((params: any): any => {});
 
-  const hadInitialState = ref(
+  const hadInitialState = ref<boolean>(
     // @ts-ignore
     typeof window !== "undefined" && window.__markwhen_initial_state
   );
-
-  // 添加开发环境下的 mock 数据初始化
-  if (process.env.NODE_ENV === 'development') {
-    const mockText = `title: 我的时间线
-description: 这是一个测试时间线
-
-section 第一部分
-2024/01/01: 事件1
-2024/02/01: 事件2
-endSection
-
-section 第二部分
-2024/03/01: 事件3
-2024/04/01: 事件4
-endSection`;
-
-    const mw = parse(mockText);
-    app.value = {
-      isDark: false,
-      colorMap: useColors(mw.timelines[0]).value,
-    };
-    markwhen.value = {
-      rawText: mockText,
-      parsed: mw.timelines,
-      transformed: mw.timelines[0].events,
-    };
-  }
 
   const hash = computed(() => {
     if (markwhen.value?.rawText) {
@@ -77,61 +55,57 @@ endSection`;
     return `#mw=${hash.value}`;
   });
 
-  const editorLink = computed(() => pathOrHash.value);
-  const timelineLink = computed(() => pathOrHash.value);
+  const editorLink = computed(
+    () => `https://meridiem.markwhen.com${pathOrHash.value}`
+  );
+  const timelineLink = computed(
+    () => `https://timeline.markwhen.com${pathOrHash.value}`
+  );
   const embedLink = computed(() => `<iframe src="${timelineLink.value}" />`);
 
   watchEffect(async () => {
     const { user, timeline } = route.params;
     if (user) {
       try {
-        // 使用默认的 mock 数据
-        const mockText = `title: 我的时间线
-description: 这是一个测试时间线
-
-section 第一部分
-2024/01/01: 事件1
-2024/02/01: 事件2
-endSection
-
-section 第二部分
-2024/03/01: 事件3
-2024/04/01: 事件4
-endSection`;
-
-        const mw = parse(mockText);
-        app.value = {
-          isDark: false,
-          colorMap: useColors(mw.timelines[0]).value,
-        };
-        markwhen.value = {
-          rawText: mockText,
-          parsed: mw.timelines,
-          transformed: mw.timelines[0].events,
-        };
-        showEditButton.value = true;
-        showCopyLinkButton.value = false;
-      } catch (e) {
-        console.error("Failed to parse timeline:", e);
-      }
+        const url = timeline
+          ? `https://meridiem.markwhen.com/${user}/${timeline}.mw`
+          : `https://meridiem.markwhen.com/${user}.mw`;
+        const resp = await fetch(url).catch(() => {});
+        if (resp) {
+          if (resp.redirected) {
+            window.location.href = resp.url;
+          }
+          if (resp.ok) {
+            const text = await resp.text();
+            const mw = parse(text);
+            app.value = {
+              isDark: false,
+              colorMap: useColors(mw).value,
+            };
+            markwhen.value = {
+              rawText: text,
+              parsed: mw,
+              transformed: mw.events as Sourced<EventGroup>,
+            };
+            showEditButton.value = true;
+            showCopyLinkButton.value = false;
+          }
+        }
+      } catch {}
     } else if (route.hash && route.hash.startsWith("#mw=")) {
-      try {
-        const decoded = atob(route.hash.substring("#mw=".length));
-        const mw = parse(decoded);
-        app.value = {
-          isDark: false,
-          colorMap: useColors(mw.timelines[0]).value,
-        };
-        markwhen.value = {
-          rawText: decoded,
-          parsed: mw.timelines,
-          transformed: mw.timelines[0].events,
-        };
-        showEditButton.value = true;
-        showCopyLinkButton.value = false;
-      } catch (e) {
-        console.error("Failed to parse timeline from hash:", e);
-      }
+      const decoded = atob(route.hash.substring("#mw=".length));
+      const mw = parse(decoded);
+      app.value = {
+        isDark: false,
+        colorMap: useColors(mw).value,
+      };
+      markwhen.value = {
+        rawText: decoded,
+        parsed: mw,
+        transformed: mw.events as Sourced<EventGroup>,
+      };
+      showEditButton.value = true;
+      showCopyLinkButton.value = false;
     }
   });
 
@@ -184,7 +158,7 @@ endSection`;
     path: EventPath,
     dateRangeIso: DateRangeIso,
     scale: DisplayScale,
-    preferredInterpolationFormat: DateFormat | undefined
+    preferredInterpolationFormat?: DateFormat
   ) => {
     const params = {
       path,
@@ -199,10 +173,7 @@ endSection`;
     postRequest("markwhenState");
     postRequest("appState");
   };
-
-  if (process.env.NODE_ENV !== 'development') {
-    requestStateUpdate();
-  }
+  requestStateUpdate();
 
   return {
     app,
