@@ -50,42 +50,27 @@ export const useMarkwhenStore = defineStore("markwhen", () => {
     return `#mw=${hash.value}`;
   });
 
-  const editorLink = computed(
-    () => `https://app.markwhen.com${pathOrHash.value}`
-  );
-  const timelineLink = computed(
-    () => `https://timeline.markwhen.com${pathOrHash.value}`
-  );
+  const editorLink = computed(() => pathOrHash.value);
+  const timelineLink = computed(() => pathOrHash.value);
   const embedLink = computed(() => `<iframe src="${timelineLink.value}" />`);
 
   watchEffect(async () => {
     const { user, timeline } = route.params;
     if (user) {
       try {
-        const url = timeline
-          ? `https://app.markwhen.com/${user}/${timeline}.mw`
-          : `https://app.markwhen.com/${user}.mw`;
-        const resp = await fetch(url).catch(() => {});
-        if (resp) {
-          if (resp.redirected) {
-            window.location.href = resp.url;
-          }
-          if (resp.ok) {
-            const text = await resp.text();
-            const mw = parse(text);
-            app.value = {
-              isDark: false,
-              colorMap: useColors(mw.timelines[0]).value,
-            };
-            markwhen.value = {
-              rawText: text,
-              parsed: mw.timelines,
-              transformed: mw.timelines[0].events,
-            };
-            showEditButton.value = true;
-            showCopyLinkButton.value = false;
-          }
-        }
+        const text = "";
+        const mw = parse(text);
+        app.value = {
+          isDark: false,
+          colorMap: useColors(mw.timelines[0]).value,
+        };
+        markwhen.value = {
+          rawText: text,
+          parsed: mw.timelines,
+          transformed: mw.timelines[0].events,
+        };
+        showEditButton.value = true;
+        showCopyLinkButton.value = false;
       } catch {}
     } else if (route.hash && route.hash.startsWith("#mw=")) {
       const decoded = atob(route.hash.substring("#mw=".length));

@@ -27,6 +27,9 @@ import ReferenceDateVue from "./Events/ReferenceDate.vue";
 import NowLine from "./Events/NowLine.vue";
 import { useDoubleTap } from "./composables/useDoubleTap";
 
+// 添加版本号常量
+const VERSION = "1.0.2"; // 每次发布时更新此版本号
+
 const timelineStore = useTimelineStore();
 const markwhenStore = useMarkwhenStore();
 
@@ -155,7 +158,7 @@ const { isPanning } = useGestures(timelineElement, () => {
 });
 
 const scrollToDate = (
-  dateTime: DateTime,
+  dateTime: DateTime<true>,
   force: boolean = false,
   immediate: boolean = false
 ) => {
@@ -220,6 +223,9 @@ const setInitialScrollAndScale = () =>
   scrollToDateRangeImmediate(timelineStore.pageRange);
 
 onMounted(() => {
+  // 输出版本号到控制台
+  console.log(`Markwhen Timeline Version: ${VERSION}`);
+
   // scrollToNow();
   timelineStore.setViewportGetter(getViewport);
   const te = timelineElement.value!;

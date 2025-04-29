@@ -83,6 +83,9 @@ mv/
 └── tsconfig.json           # TypeScript 配置
 ```
 
+timeline 仓库地址：<https://github.com/markwhen/markwhen-timeline> 起始版本： 47000e2
+calendar 仓库地址：<https://github.com/markwhen/markwhen-calendar> 起始版本： 7c4d393
+
 #### 核心功能
 
 1. **数据解析**
