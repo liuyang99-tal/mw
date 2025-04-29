@@ -21,7 +21,7 @@
   },
   "devDependencies": {
     "@types/luxon": "^3.3.2",
-    "@types/node": "^18.11.12",
+    "@types/node": "^18.19.87",
     "@vitejs/plugin-vue": "^4.3.4",
     "@vue/devtools": "^6.5.0",
     "@vue/tsconfig": "^0.1.3",

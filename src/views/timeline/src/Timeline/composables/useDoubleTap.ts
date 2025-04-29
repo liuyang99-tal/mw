@@ -18,7 +18,7 @@ export const useDoubleTap = (setViewport: () => void) => {
     x: 0,
     y: 0,
   };
-  let timeout: number;
+  let timeout: ReturnType<typeof setTimeout>;
 
   const timelineStore = useTimelineStore();
   let initialScale = 0;

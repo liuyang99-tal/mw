@@ -28,7 +28,7 @@ import NowLine from "./Events/NowLine.vue";
 import { useDoubleTap } from "./composables/useDoubleTap";
 
 // 添加版本号常量
-const VERSION = "1.0.2"; // 每次发布时更新此版本号
+const VERSION = "1.0.4"; // 每次发布时更新此版本号
 
 const timelineStore = useTimelineStore();
 const markwhenStore = useMarkwhenStore();
