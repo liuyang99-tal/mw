@@ -21,10 +21,9 @@ const getPanel = () => {
 
 export class MarkwhenTimelineEditorProvider
   implements
-    vscode.CustomTextEditorProvider,
-    vscode.HoverProvider,
-    vscode.FoldingRangeProvider
-{
+  vscode.CustomTextEditorProvider,
+  vscode.HoverProvider,
+  vscode.FoldingRangeProvider {
   document?: vscode.TextDocument;
   lpc?: ReturnType<typeof useLpc>;
   parseResult?: {
@@ -58,7 +57,7 @@ export class MarkwhenTimelineEditorProvider
 
   private static readonly viewType = "markwhen.timeline";
 
-  constructor(private readonly context: vscode.ExtensionContext) {}
+  constructor(private readonly context: vscode.ExtensionContext) { }
 
   async provideFoldingRanges(
     document: vscode.TextDocument,
@@ -224,6 +223,9 @@ export class MarkwhenTimelineEditorProvider
 
     getPanel().webview.options = {
       enableScripts: true,
+      localResourceRoots: [
+        vscode.Uri.joinPath(this.context.extensionUri, 'assets/views')
+      ]
     };
 
     await this.setView(this.view);
@@ -274,12 +276,29 @@ export class MarkwhenTimelineEditorProvider
     view: "timeline" | "calendar"
   ): Promise<string> {
     const p = vscode.Uri.joinPath(
-      vscode.Uri.file(this.context.asAbsolutePath(`assets/views/${view}.html`))
+      vscode.Uri.file(this.context.asAbsolutePath(`assets/views/${view}/index.html`))
     );
     return vscode.workspace.fs.readFile(p).then((v) => {
       const td = new TextDecoder();
       const s = td.decode(v);
-      return s;
+      // 处理资源路径
+      return s.replace(
+        /(src|href)="([^"]+)"/g,
+        (match, attr, path) => {
+          // 如果路径已经是绝对路径，则不需要修改
+          if (path.startsWith('http') || path.startsWith('//')) {
+            return match;
+          }
+          // 处理相对路径
+          const webviewUri = vscode.Uri.joinPath(
+            this.context.extensionUri,
+            'assets/views',
+            view,
+            path
+          );
+          return `${attr}="${getPanel().webview.asWebviewUri(webviewUri)}"`;
+        }
+      );
     });
   }
 
