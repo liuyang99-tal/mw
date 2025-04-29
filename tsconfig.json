@@ -10,6 +10,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "paths": {
+      "@markwhen/parser": ["./node_modules/@markwhen/parser/lib/index"],
       "@markwhen/timeline": ["./views/timeline/src/index.ts"],
       "@markwhen/calendar": ["./views/calendar/src/index.ts"]
     }
@@ -19,6 +20,6 @@
     // "noUnusedParameters": true,  /* Report errors on unused parameters. */
   },
   "include": ["src"],
-  "exclude": ["node_modules", ".vscode-test"]
+  "exclude": ["node_modules", ".vscode-test", "src/views"]
   // "references": [{ "path": "./languageServer" }]
 }

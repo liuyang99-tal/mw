@@ -9,13 +9,13 @@ const ensureDir = (dir) => {
 };
 
 // 复制 timeline 资源
-const timelineDist = "views/timeline/dist";
+const timelineDist = "src/views/timeline/dist";
 const timelineTarget = "assets/views/timeline";
 ensureDir(timelineTarget);
 cpSync(timelineDist, timelineTarget, { recursive: true });
 
 // 复制 calendar 资源
-const calendarDist = "views/calendar/dist";
+const calendarDist = "src/views/calendar/dist";
 const calendarTarget = "assets/views/calendar";
 ensureDir(calendarTarget);
 cpSync(calendarDist, calendarTarget, { recursive: true });
