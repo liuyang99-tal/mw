@@ -5,8 +5,10 @@ import {
   MarkwhenTimelineEditorProvider,
   webviewPanels,
 } from "./MarkwhenTimelineEditorProvider";
-import "./semanticTokenProvider";
-import { legend, provider } from "./semanticTokenProvider";
+import { 
+  legend, 
+  provider 
+} from "./semanticTokenProvider";
 
 const command_preview = "markwhen.openPreview";
 const command_viewInTimeline = "markwhen.viewInTimeline";

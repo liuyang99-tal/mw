@@ -1,6 +1,5 @@
 import * as vscode from "vscode";
 import { parse } from "./useParserWorker";
-import { isEvent } from "@markwhen/parser";
 
 const tokenTypes = [
   "comment",
@@ -69,28 +68,23 @@ export const provider: vscode.DocumentSemanticTokensProvider = {
           
           // 根据 range.type 映射到对应的 token 类型
           let tokenType: string;
-          switch (range.type) {
-            case 'frontMatterDelimiter':
-            case 'headerKeyColon':
+          switch (range.type as RangeType) {
+            case RangeType.FrontmatterDelimiter:
+            case RangeType.HeaderKeyColon:
+            case RangeType.Section:
               tokenType = 'keyword';
               break;
-            case 'headerKey':
+            case RangeType.HeaderKey:
+            case RangeType.DateRange:
               tokenType = 'type';
               break;
-            case 'headerValue':
+            case RangeType.HeaderValue:
               tokenType = 'string';
               break;
-            case 'section':
-            case 'endSection':
-              tokenType = 'keyword';
-              break;
-            case 'dateRange':
-              tokenType = 'type';
-              break;
-            case 'tag':
+            case RangeType.Tag:
               tokenType = 'property';
               break;
-            case 'comment':
+            case RangeType.Comment:
               tokenType = 'comment';
               break;
             default:
