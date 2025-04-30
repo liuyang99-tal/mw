@@ -19,6 +19,38 @@ Read the markwhen documentation [here](https://docs.markwhen.com).
 - Now line
 - Tags
 
+## 语法高亮支持
+
+Markwhen 扩展提供了完整的语法高亮支持，包括：
+
+1. **基础语法元素**
+   - 日期范围：`2024/01/01 - 2024/12/31`
+   - 事件标题：`2024/01/01: 事件标题`
+   - 标签：`#tag1 #tag2`
+   - 分组：`section 分组标题` 和 `endSection`
+
+2. **语义化高亮**
+   - 使用 VS Code 的语义化令牌系统
+   - 支持主题自定义
+   - 实时更新，随编辑即时反映
+
+3. **配置选项**
+
+   ```json
+   {
+     "markwhen": {
+       "editor.semanticHighlighting.enabled": true
+     }
+   }
+   ```
+
+4. **高亮范围**
+   - 日期部分
+   - 事件内容
+   - 标签
+   - 分组标题
+   - 分隔符
+
 ## 项目架构
 
 ### 1. 整体架构
