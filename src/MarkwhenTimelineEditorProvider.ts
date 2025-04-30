@@ -135,7 +135,7 @@ export class MarkwhenTimelineEditorProvider
         return this.parseResult?.markwhenState || {
           rawText: this.document?.getText() || "",
           parsed: [],
-          transformed: []
+          transformed: { properties: [], tags: [], title: '', children: [], source: 'default' }
         };
       },
       appState: () => {
@@ -206,7 +206,7 @@ export class MarkwhenTimelineEditorProvider
         markwhenState: {
           rawText,
           parsed: [],
-          transformed: [],
+          transformed: { properties: [], tags: [], title: '', children: [], source: 'default' },
         },
         appState: {
           colorMap: {},
@@ -218,8 +218,14 @@ export class MarkwhenTimelineEditorProvider
     this.parseResult = {
       markwhenState: {
         rawText,
-        parsed: parsed,  // 恢复原始实现
-        transformed: parsed.events.children,
+        parsed: parsed,
+        transformed: {
+          properties: [],
+          tags: [],
+          title: '',
+          children: parsed.events.children,
+          source: 'default'
+        },
       },
       appState: {
         colorMap: useColors(parsed),
