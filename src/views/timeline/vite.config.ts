@@ -2,7 +2,6 @@ import { fileURLToPath, URL } from "node:url";
 
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
-import { viteSingleFile } from "vite-plugin-singlefile";
 import vueDevTools from 'vite-plugin-vue-devtools';
 
 // https://vitejs.dev/config/
@@ -16,7 +15,6 @@ export default defineConfig({
         },
       },
     }),
-    viteSingleFile(),
   ],
   resolve: {
     alias: {
@@ -36,15 +34,18 @@ export default defineConfig({
   },
   build: {
     sourcemap: true,
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: false,
-        drop_debugger: false
-      }
-    },
+    minify: false,
     rollupOptions: {
-      external: ['./src/dev.ts']
+      output: {
+        assetFileNames: (assetInfo) => {
+          if (assetInfo.name.endsWith('.css')) {
+            return 'assets/[name][extname]';
+          }
+          return 'assets/[name]-[hash][extname]';
+        },
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js'
+      }
     }
   }
 });

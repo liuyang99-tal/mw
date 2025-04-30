@@ -1,6 +1,6 @@
 import { getNonce } from "./utilities/nonce";
-import { Webview } from "vscode";
-import WebSocket, { WebSocketServer } from "ws";
+import { type Webview } from "vscode";
+import WebSocket, { type WebSocketServer } from "ws";
 
 export type ColorMap = Record<string, Record<string, string>>;
 export type EventPath = number[];

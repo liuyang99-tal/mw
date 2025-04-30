@@ -78,6 +78,12 @@ export interface Message<T extends MessageType> {
   id: string;
   params?: MessageParam<T>;
 }
+
+export interface ResponseMessage<T extends MessageType> extends Message<T> {
+  response: true;
+  params: MessageParam<T>;
+}
+
 export const getNonce = () => {
   let text = "";
   const possible =
@@ -95,6 +101,7 @@ type MessageListeners = {
 };
 
 export const useLpc = (listeners?: MessageListeners) => {
+  console.log("[Timeline] Initializing LPC communication");
   const calls: Map<
     string,
     {
@@ -108,14 +115,21 @@ export const useLpc = (listeners?: MessageListeners) => {
     // @ts-ignore
     (window.__markwhen_wss_url as string | undefined);
 
+  console.log("[Timeline] WebSocket URL:", wssUrl);
+
   let socket: WebSocket | undefined;
   let hasConnected = false;
   if (wssUrl) {
+    console.log("[Timeline] Attempting WebSocket connection");
     socket = new WebSocket(wssUrl);
     socket.onopen = () => {
+      console.log("[Timeline] WebSocket connected");
       hasConnected = true;
       postRequest("appState");
       postRequest("markwhenState");
+    };
+    socket.onerror = (error) => {
+      console.error("[Timeline] WebSocket error:", error);
     };
   }
 
@@ -124,15 +138,25 @@ export const useLpc = (listeners?: MessageListeners) => {
     if (vscApi) {
       return vscApi;
     }
-    vscApi = acquireVsCodeApi!();
+    console.log("[Timeline] Acquiring VS Code API");
+    if (typeof acquireVsCodeApi === "undefined") {
+      console.error("[Timeline] acquireVsCodeApi is not available");
+      throw new Error("VS Code API is not available");
+    }
+    vscApi = acquireVsCodeApi();
     return vscApi;
   };
 
   const post = <T extends MessageType>(message: Message<T>) => {
+    console.log("[Timeline] Posting message:", message);
     if (socket && hasConnected) {
       socket.send(JSON.stringify(message));
     } else if (typeof acquireVsCodeApi !== "undefined") {
-      vscode()?.postMessage(message);
+      try {
+        vscode()?.postMessage(message);
+      } catch (error) {
+        console.error("[Timeline] Failed to post message to VS Code:", error);
+      }
     } else if (
       typeof window !== "undefined" &&
       typeof window.parent !== "undefined" &&
@@ -140,17 +164,16 @@ export const useLpc = (listeners?: MessageListeners) => {
     ) {
       window.parent.postMessage(message, "*");
     } else if (import.meta.env.DEV) {
-      // 开发环境下，忽略 Nothing to post to 警告
-      console.debug("No communication channel available in development mode");
+      console.debug("[Timeline] No communication channel available in development mode");
     } else {
-      console.error("Nothing to post to");
+      console.error("[Timeline] No communication channel available");
     }
   };
 
   const postRequest = <T extends MessageType>(
     type: T,
     params?: MessageParam<T>
-  ) => {
+  ): Promise<ResponseMessage<T>> => {
     const id = `markwhen_${getNonce()}`;
     return new Promise((resolve, reject) => {
       calls.set(id, { resolve, reject });
@@ -172,20 +195,42 @@ export const useLpc = (listeners?: MessageListeners) => {
   const messageListener = <T extends keyof MessageTypes>(
     e: MessageEvent<Message<T>>
   ) => {
-    if (!e.data.id || !e.data.id.startsWith("markwhen")) {
+    console.log("[Timeline] Raw message event:", e);
+    console.log("[Timeline] Message data:", e.data);
+    
+    if (!e.data) {
+      console.error("[Timeline] Received empty message data");
       return;
     }
+    
+    if (!e.data.id) {
+      console.error("[Timeline] Message missing id:", e.data);
+      return;
+    }
+    
+    if (!e.data.id.startsWith("markwhen")) {
+      console.log("[Timeline] Ignoring non-markwhen message:", e.data.id);
+      return;
+    }
+    
+    console.log("[Timeline] Processing message:", e.data);
+    console.log("[Timeline] Message type:", e.data.type);
+    console.log("[Timeline] Message params:", e.data.params);
+    
     const data = e.data;
     if (data.response) {
+      console.log("[Timeline] Handling response message");
       calls.get(data.id)?.resolve(data);
       calls.delete(data.id);
     } else if (data.request) {
+      console.log("[Timeline] Handling request message");
       const result = listeners?.[data.type]?.(data.params!);
       Promise.resolve(result).then((resp) => {
+        console.log("[Timeline] Sending response:", resp);
         postResponse(data.id, data.type, resp);
       });
     } else {
-      console.error("Not a request or response", data);
+      console.error("[Timeline] Invalid message format - not a request or response:", data);
     }
   };
 

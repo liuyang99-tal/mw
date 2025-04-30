@@ -1,15 +1,15 @@
 import { DateTime, type DurationUnits } from "luxon";
 import {
   AMERICAN_DATE_FORMAT,
-  DateRangePart,
+  type DateRangePart,
   EUROPEAN_DATE_FORMAT,
-  Event,
+  type Event,
   toDateRange,
   type DateFormat,
   type DateRange,
+  type Eventy,
+  isEvent,
 } from "@markwhen/parser";
-import type { SomeNode } from "@markwhen/parser";
-import { isEventNode, eventValue } from "@markwhen/parser";
 
 export enum Weight {
   SECOND = 0,
@@ -261,14 +261,11 @@ export function dateRangeToString(
   return `${asIso(range.fromDateTime)} - ${asIso(range.toDateTime)}`;
 }
 
-export const eventMidpoint = (node: SomeNode): DateTime | undefined => {
-  if (isEventNode(node)) {
-    return dateMidpoint(toDateRange(eventValue(node).dateRangeIso));
-  } else {
-    if (!node.range || !node.range.fromDateTime || !node.range.toDateTime)
-      return undefined;
+export const eventMidpoint = (node: Eventy): DateTime | undefined => {
+  if (!isEvent(node)) {
+    return undefined;
   }
-  return dateMidpoint(node.range);
+  return dateMidpoint(toDateRange(node.dateRangeIso));
 };
 
 export const dateMidpoint = (range: DateRange): DateTime => {

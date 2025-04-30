@@ -19,6 +19,7 @@ import { useColors } from "./useColors";
 import type { EventGroup } from "@markwhen/parser";
 
 export const useMarkwhenStore = defineStore("markwhen", () => {
+  console.log("[Timeline] Initializing markwhen store");
   const route = useRoute();
   const app = ref<AppState>({ colorMap: { default: {} } });
   const markwhen = ref<MarkwhenState>();
@@ -116,6 +117,16 @@ export const useMarkwhenStore = defineStore("markwhen", () => {
       app.value = s;
     },
     markwhenState: (s) => {
+      if (!s) {
+        console.error("[Timeline] Received null markwhen state");
+        return;
+      }
+      
+      if (!s.parsed) {
+        console.error("[Timeline] Missing parsed data in markwhen state");
+        return;
+      }
+      
       markwhen.value = s;
     },
     jumpToPath: ({ path }) => {
@@ -124,7 +135,9 @@ export const useMarkwhenStore = defineStore("markwhen", () => {
     jumpToRange: ({ dateRangeIso }) => {
       onJumpToRange.value?.(dateRangeIso);
     },
-    getSvg: (params: any) => onGetSvg.value?.(params),
+    getSvg: (params: any) => {
+      onGetSvg.value?.(params);
+    },
   });
 
   const setHoveringPath = (path?: EventPath) => {
@@ -173,7 +186,53 @@ export const useMarkwhenStore = defineStore("markwhen", () => {
     postRequest("markwhenState");
     postRequest("appState");
   };
-  requestStateUpdate();
+
+  // 初始化状态
+  const initializeState = async () => {
+    console.log("[Timeline] Initializing state");
+    try {
+      console.log("[Timeline] Requesting markwhen state");
+      const markwhenState = await postRequest("markwhenState");
+      console.log("[Timeline] Received markwhen state response:", markwhenState);
+      
+      if (!markwhenState) {
+        console.error("[Timeline] No markwhen state received");
+        return;
+      }
+      
+      if (!markwhenState.params) {
+        console.error("[Timeline] Markwhen state missing params:", markwhenState);
+        return;
+      }
+      
+      console.log("[Timeline] Setting markwhen state:", markwhenState.params);
+      markwhen.value = markwhenState.params;
+
+      console.log("[Timeline] Requesting app state");
+      const appState = await postRequest("appState");
+      console.log("[Timeline] Received app state response:", appState);
+      
+      if (!appState) {
+        console.error("[Timeline] No app state received");
+        return;
+      }
+      
+      if (!appState.params) {
+        console.error("[Timeline] App state missing params:", appState);
+        return;
+      }
+      
+      console.log("[Timeline] Setting app state:", appState.params);
+      app.value = appState.params;
+    } catch (error) {
+      console.error("[Timeline] Failed to initialize state:", error);
+    }
+  };
+
+  // 延迟初始化,等待 VS Code API 就绪
+  setTimeout(() => {
+    initializeState();
+  }, 100);
 
   return {
     app,

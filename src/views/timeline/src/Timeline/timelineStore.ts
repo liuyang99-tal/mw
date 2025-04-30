@@ -74,10 +74,10 @@ export const useTimelineStore = defineStore("timeline", () => {
   );
   const progressDisplay = lsRef<"on" | "off">("progressDisplay2", "on");
 
-  const pageTimeline = computed(() => markwhenState.value.parsed);
+  const pageTimeline = computed(() => markwhenState.value?.parsed);
   const pageTimelineMetadata = computed(() => {
     const now = DateTime.now();
-    if (!pageTimeline.value.events.children.length) {
+    if (!pageTimeline.value?.events?.children?.length) {
       return {
         earliestTime: now.minus({ years: 2 }),
         latestTime: now.plus({ years: 2 }),

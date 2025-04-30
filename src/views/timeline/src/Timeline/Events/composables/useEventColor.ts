@@ -10,8 +10,8 @@ export const useEventColor = (eventRef: MaybeRef<Sourced<Eventy>>) => {
 
   watchEffect(() => {
     try {
-      const node = unref(eventRef);
-      let ourTags = node.tags;
+    const node = unref(eventRef);
+    let ourTags = node.tags;
       const source = node.source || "default";
       
       // 确保 colors 对象存在

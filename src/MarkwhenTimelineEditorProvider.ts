@@ -1,18 +1,19 @@
 import { TextDecoder } from "util";
 import vscode from "vscode";
-import { AppState, EventPath, useLpc } from "./lpc";
+import { type AppState, type EventPath, useLpc } from "./lpc";
 import { useColors } from "./utilities/colorMap";
 import { parse } from "./useParserWorker";
 import {
-  Node,
-  Event,
+  type Eventy,
+  type Event,
   get,
   toDateRange,
-  DateRangeIso,
-  DateFormat,
+  type DateRangeIso,
+  type DateFormat,
+  isEvent,
 } from "@markwhen/parser";
 import { editEventDateRange } from "./dateTextInterpolation";
-import { DisplayScale } from "./utilities/dateTimeUtilities";
+import { type DisplayScale } from "./utilities/dateTimeUtilities";
 
 export let webviewPanels = [] as vscode.WebviewPanel[];
 const getPanel = () => {
@@ -66,21 +67,20 @@ export class MarkwhenTimelineEditorProvider
   ): Promise<vscode.FoldingRange[]> {
     const mw = await parse(document.getText());
     const ranges = [] as vscode.FoldingRange[];
-    for (const timeline of mw.timelines) {
-      const indices = Object.keys(timeline.foldables);
-      for (const index of indices) {
-        // @ts-ignore
-        const foldable = timeline.foldables[index] as Foldable;
-        ranges.push(
-          new vscode.FoldingRange(
-            foldable.startLine,
-            document.positionAt(foldable.endIndex).line,
-            foldable.type === "section"
-              ? vscode.FoldingRangeKind.Region
-              : vscode.FoldingRangeKind.Comment
-          )
-        );
-      }
+    
+    // 使用 foldables 而不是 timelines
+    const indices = Object.keys(mw.foldables);
+    for (const index of indices) {
+      const foldable = mw.foldables[index];
+      ranges.push(
+        new vscode.FoldingRange(
+          foldable.startLine,
+          document.positionAt(foldable.endIndex).line,
+          foldable.type === "section"
+            ? vscode.FoldingRangeKind.Region
+            : vscode.FoldingRangeKind.Comment
+        )
+      );
     }
     return ranges;
   }
@@ -122,22 +122,25 @@ export class MarkwhenTimelineEditorProvider
   }
 
   public async setView(view: "timeline" | "calendar") {
+    console.log("[Markwhen] Setting view to:", view);
     this.view = view;
+    console.log("[Markwhen] Getting HTML for webview...");
     getPanel().webview.html = await this.getHtmlForWebview(this.view);
+    console.log("[Markwhen] HTML loaded, initializing LPC...");
 
     // @ts-ignore
     this.lpc = await useLpc(getPanel().webview, {
       markwhenState: async (event) => {
-        const rawText = this.document?.getText() || "";
-        const parsed = await parse(rawText);
-        return {
-          rawText,
-          parsed: parsed.timelines,
-          transformed: parsed.timelines[0].events,
+        // 直接返回已解析的结果
+        return this.parseResult?.markwhenState || {
+          rawText: this.document?.getText() || "",
+          parsed: [],
+          transformed: []
         };
       },
       appState: () => {
-        this.lpc?.postRequest("appState", this.getAppState());
+        const appState = this.getAppState();
+        this.lpc?.postRequest("appState", appState);
       },
       editEventDateRange: ({
         path,
@@ -153,24 +156,31 @@ export class MarkwhenTimelineEditorProvider
         const eventNode = get(
           this.parseResult?.markwhenState.transformed,
           path
-        ) as Node<Event>;
-        const event = eventNode.value;
+        ) as Eventy;
+        if (!eventNode) {
+          return;
+        }
+        const event = isEvent(eventNode) ? eventNode : undefined;
+        if (!event) {
+          return;
+        }
         const newText = editEventDateRange(
           event,
-          toDateRange(range),
-          scale,
-          preferredInterpolationFormat
+          toDateRange(event.dateRangeIso),
+          "day",
+          undefined
         );
         if (!newText) {
           return;
         }
+        const textRange = new vscode.Range(
+          new vscode.Position(event.textRanges.datePart.from, 0),
+          new vscode.Position(event.textRanges.datePart.to, 0)
+        );
         const edit = new vscode.WorkspaceEdit();
         edit.replace(
           this.document!.uri,
-          new vscode.Range(
-            this.document!.positionAt(event.dateRangeInText.from),
-            this.document!.positionAt(event.dateRangeInText.to)
-          ),
+          textRange,
           newText
         );
         return vscode.workspace.applyEdit(edit);
@@ -189,16 +199,30 @@ export class MarkwhenTimelineEditorProvider
 
   async parse() {
     const rawText = this.document?.getText() ?? "";
-    // console.log(rawText)
     const parsed = await parse(rawText);
+    
+    if (!parsed.events || !parsed.events.children || parsed.events.children.length === 0) {
+      this.parseResult = {
+        markwhenState: {
+          rawText,
+          parsed: [],
+          transformed: [],
+        },
+        appState: {
+          colorMap: {},
+        },
+      };
+      return;
+    }
+    
     this.parseResult = {
       markwhenState: {
         rawText,
-        parsed: parsed.timelines,
-        transformed: parsed.timelines[0].events,
+        parsed: parsed,  // 恢复原始实现
+        transformed: parsed.events.children,
       },
       appState: {
-        colorMap: useColors(parsed.timelines[0]),
+        colorMap: useColors(parsed),
       },
     };
     this.postState();
@@ -209,7 +233,13 @@ export class MarkwhenTimelineEditorProvider
   }
 
   public postState() {
+    console.log("[Markwhen] Posting state to webview");
+    console.log("[Markwhen] markwhenState:", {
+      timelineCount: this.parseResult?.markwhenState.parsed.length,
+      eventCount: this.parseResult?.markwhenState.transformed.length
+    });
     this.lpc?.postRequest("markwhenState", this.parseResult?.markwhenState);
+    console.log("[Markwhen] appState:", this.getAppState());
     this.lpc?.postRequest("appState", this.getAppState());
   }
 
@@ -224,7 +254,10 @@ export class MarkwhenTimelineEditorProvider
     getPanel().webview.options = {
       enableScripts: true,
       localResourceRoots: [
-        vscode.Uri.joinPath(this.context.extensionUri, 'assets/views')
+        vscode.Uri.joinPath(this.context.extensionUri, 'assets'),
+        vscode.Uri.joinPath(this.context.extensionUri, 'assets/views'),
+        vscode.Uri.joinPath(this.context.extensionUri, 'assets/views/timeline'),
+        vscode.Uri.joinPath(this.context.extensionUri, 'assets/views/timeline/assets')
       ]
     };
 
@@ -281,24 +314,34 @@ export class MarkwhenTimelineEditorProvider
     return vscode.workspace.fs.readFile(p).then((v) => {
       const td = new TextDecoder();
       const s = td.decode(v);
-      // 处理资源路径
-      return s.replace(
-        /(src|href)="([^"]+)"/g,
-        (match, attr, path) => {
-          // 如果路径已经是绝对路径，则不需要修改
-          if (path.startsWith('http') || path.startsWith('//')) {
-            return match;
+      
+      // 检查是否处于开发调试模式
+      const isDebug = process.env.NODE_ENV === 'development';
+      
+      if (isDebug) {
+        // 开发模式: 处理资源路径
+        return s.replace(
+          /(src|href)="([^"]+)"/g,
+          (match, attr, path) => {
+            // 如果路径已经是绝对路径，则不需要修改
+            if (path.startsWith('http') || path.startsWith('//')) {
+              return match;
+            }
+            // 处理相对路径
+            const webviewUri = vscode.Uri.joinPath(
+              this.context.extensionUri,
+              'assets/views',
+              view,
+              path
+            );
+            const uri = getPanel().webview.asWebviewUri(webviewUri);
+            return `${attr}="${uri.toString()}"`;
           }
-          // 处理相对路径
-          const webviewUri = vscode.Uri.joinPath(
-            this.context.extensionUri,
-            'assets/views',
-            view,
-            path
-          );
-          return `${attr}="${getPanel().webview.asWebviewUri(webviewUri)}"`;
-        }
-      );
+        );
+      } else {
+        // 生产模式: 直接返回合并后的HTML
+        return s;
+      }
     });
   }
 
