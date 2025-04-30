@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { parse } from "./useParserWorker";
+import { isEvent } from "@markwhen/parser";
 
 const tokenTypes = [
   "comment",
@@ -12,6 +13,7 @@ const tokenTypes = [
   "type",
   "class",
 ];
+
 enum RangeType {
   Comment = "comment",
   CheckboxItemIndicator = "checkboxItemIndicator",
@@ -35,6 +37,7 @@ enum RangeType {
   HeaderKeyColon = "headerKeyColon",
   HeaderValue = "headerValue"
 }
+
 export const legend = new vscode.SemanticTokensLegend(tokenTypes, []);
 
 export const provider: vscode.DocumentSemanticTokensProvider = {
@@ -43,36 +46,64 @@ export const provider: vscode.DocumentSemanticTokensProvider = {
   ): Promise<vscode.SemanticTokens> {
     const tokensBuilder = new vscode.SemanticTokensBuilder(legend);
 
-    const markwhen = await parse(document.getText());
-    markwhen.timelines.forEach((timeline: any) => {
-      timeline.ranges.forEach((range: any) => {
-        const from = document.positionAt(range.from);
-        const to = document.positionAt(range.to);
-        const vscodeRange = new vscode.Range(from, to);
-        switch (range.type) {
-          case RangeType.listItemIndicator:
-          case RangeType.CheckboxItemIndicator:
-            tokensBuilder.push(vscodeRange, "variable");
-            break;
-          case RangeType.Comment:
-            tokensBuilder.push(vscodeRange, "comment");
-            break;
-          case RangeType.DateRange:
-            tokensBuilder.push(vscodeRange, "type");
-            break;
-          case RangeType.Description:
-          case RangeType.Section:
-          case RangeType.Title:
-          case RangeType.View:
-            tokensBuilder.push(vscodeRange, "keyword");
-            break;
-          case RangeType.Tag:
-            tokensBuilder.push(vscodeRange, "property");
-          case RangeType.Recurrence:
-            tokensBuilder.push(vscodeRange, "class");
+    const mw = await parse(document.getText());
+    
+    // 直接使用 ranges 进行语法高亮
+    if (mw.ranges) {
+      for (const range of mw.ranges) {
+        try {
+          const startPosition = document.positionAt(range.from);
+          const endPosition = document.positionAt(range.to);
+          
+          // 跳过跨行的 token
+          if (startPosition.line !== endPosition.line) {
+            continue;
+          }
+          
+          const tokenRange = new vscode.Range(
+            startPosition.line,
+            startPosition.character,
+            startPosition.line,
+            endPosition.character
+          );
+          
+          // 根据 range.type 映射到对应的 token 类型
+          let tokenType: string;
+          switch (range.type) {
+            case 'frontMatterDelimiter':
+            case 'headerKeyColon':
+              tokenType = 'keyword';
+              break;
+            case 'headerKey':
+              tokenType = 'type';
+              break;
+            case 'headerValue':
+              tokenType = 'string';
+              break;
+            case 'section':
+            case 'endSection':
+              tokenType = 'keyword';
+              break;
+            case 'dateRange':
+              tokenType = 'type';
+              break;
+            case 'tag':
+              tokenType = 'property';
+              break;
+            case 'comment':
+              tokenType = 'comment';
+              break;
+            default:
+              tokenType = 'string';
+          }
+          
+          tokensBuilder.push(tokenRange, tokenType);
+        } catch (error) {
+          // 忽略错误继续处理
+          continue;
         }
-      });
-    });
+      }
+    }
 
     return tokensBuilder.build();
   },

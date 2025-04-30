@@ -11,6 +11,7 @@ import { legend, provider } from "./semanticTokenProvider";
 const command_preview = "markwhen.openPreview";
 const command_viewInTimeline = "markwhen.viewInTimeline";
 
+// this method is called when your extension is activated
 export function activate(context: vscode.ExtensionContext) {
   const { providerRegistration, editor } =
     MarkwhenTimelineEditorProvider.register(context);
