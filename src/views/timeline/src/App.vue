@@ -7,7 +7,7 @@ const markwhenStore = useMarkwhenStore();
 console.log("[Timeline] Store initialized:", markwhenStore);
 
 // 输出版本信息
-console.log('Timeline Version: 1.0.4');
+console.log('Timeline Version: 1.0.5');
 
 // 只在开发环境下添加测试数据
 if (import.meta.env.DEV) {

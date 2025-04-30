@@ -35,9 +35,4 @@ const calendarSrc = path.join(__dirname, '../src/views/calendar/dist');
 const calendarDest = path.join(__dirname, '../assets/views/calendar');
 copyDir(calendarSrc, calendarDest);
 
-// 复制 worker 文件
-const workerSrc = path.join(__dirname, '../src/worker');
-const workerDest = path.join(__dirname, '../assets/worker');
-copyDir(workerSrc, workerDest);
-
 console.log('资源文件复制完成');

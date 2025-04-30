@@ -57,41 +57,22 @@ export const useMarkwhenStore = defineStore("markwhen", () => {
   });
 
   const editorLink = computed(
-    () => `https://meridiem.markwhen.com${pathOrHash.value}`
+    () => `${pathOrHash.value}`
   );
   const timelineLink = computed(
-    () => `https://timeline.markwhen.com${pathOrHash.value}`
+    () => `${pathOrHash.value}`
   );
-  const embedLink = computed(() => `<iframe src="${timelineLink.value}" />`);
+  const embedLink = computed(
+    () => `<iframe src="${pathOrHash.value}"></iframe>`
+  );
 
   watchEffect(async () => {
     const { user, timeline } = route.params;
     if (user) {
       try {
-        const url = timeline
-          ? `https://meridiem.markwhen.com/${user}/${timeline}.mw`
-          : `https://meridiem.markwhen.com/${user}.mw`;
-        const resp = await fetch(url).catch(() => {});
-        if (resp) {
-          if (resp.redirected) {
-            window.location.href = resp.url;
-          }
-          if (resp.ok) {
-            const text = await resp.text();
-            const mw = parse(text);
-            app.value = {
-              isDark: false,
-              colorMap: useColors(mw).value,
-            };
-            markwhen.value = {
-              rawText: text,
-              parsed: mw,
-              transformed: mw.events as Sourced<EventGroup>,
-            };
-            showEditButton.value = true;
-            showCopyLinkButton.value = false;
-          }
-        }
+        // 移除对 meridiem.markwhen.com 的请求
+        showEditButton.value = true;
+        showCopyLinkButton.value = false;
       } catch {}
     } else if (route.hash && route.hash.startsWith("#mw=")) {
       const decoded = atob(route.hash.substring("#mw=".length));
