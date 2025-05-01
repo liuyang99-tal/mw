@@ -5,7 +5,6 @@ import { useColors } from "./utilities/colorMap";
 import { parse } from "./useParserWorker";
 import {
   type Eventy,
-  type Event,
   get,
   toDateRange,
   type DateRangeIso,
