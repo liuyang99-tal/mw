@@ -25,10 +25,7 @@
     "Visualization"
   ],
   "activationEvents": [
-    "onCustomEditor:markwhen.timeline",
-    "onLanguage:markwhen",
-    "onCommand:markwhen.openPreview",
-    "onCommand:markwhen.viewInTimeline"
+    "onLanguage:markwhen"
   ],
   "main": "./out/extension.js",
   "configurationDefaults": {
